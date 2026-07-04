@@ -323,41 +323,33 @@ def predict(
 def predict_with_interval(
     model,
     X,
+    residuals_val,
     confidence: float = 0.90,
 ):
     """
-    Genera predicción puntual e intervalo de confianza usando
-    la dispersión entre los árboles del ExtraTreesRegressor.
+    Genera predicción puntual e intervalo de confianza calibrado
+    usando los residuales del set de validación/test.
+
+    Parameters
+    ----------
+    model : Pipeline entrenado
+    X : array-like
+        Features para predecir.
+    residuals_val : array-like
+        Residuales (y_real - y_pred) del set de validación, usados
+        para calibrar el ancho del intervalo.
+    confidence : float
+        Nivel de confianza deseado (ej. 0.90 para 90%).
+
+    Returns
+    -------
+    mean_pred, lower, upper : np.ndarray
     """
+    mean_pred = model.predict(X)
+    margen = np.quantile(np.abs(residuals_val), confidence)
 
-    # Si el modelo es un Pipeline, extraer el ExtraTreesRegressor
-    if isinstance(model, Pipeline):
-        preprocessor = model.named_steps["preprocessor"]
-        estimator = model.named_steps["model"]
-
-        X = preprocessor.transform(X)
-
-    else:
-        estimator = model
-
-    tree_preds = np.array([
-        tree.predict(X)
-        for tree in estimator.estimators_
-    ])
-
-    mean_pred = tree_preds.mean(axis=0)
-
-    lower = np.percentile(
-        tree_preds,
-        (1 - confidence) / 2 * 100,
-        axis=0,
-    )
-
-    upper = np.percentile(
-        tree_preds,
-        (1 + confidence) / 2 * 100,
-        axis=0,
-    )
+    lower = mean_pred - margen
+    upper = mean_pred + margen
 
     return mean_pred, lower, upper
 

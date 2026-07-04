@@ -1,3 +1,5 @@
+import numpy as np
+
 from src.preprocessing import load_data
 from src.features import (
     merge_data,
@@ -107,32 +109,27 @@ def main():
         y_train
     )
 
-    pred = predict(
-        best_model,
-        X_test
-    )
-
-    metrics = evaluate_metrics(
-        y_test,
-        pred
-    )
-
+    pred = predict(best_model, X_test)
+    metrics = evaluate_metrics(y_test, pred)
     print(metrics)
 
-    save_model(
-        best_model,
-        "models/forecast_model.pkl"
-    )
+    # Residuales para calibrar el intervalo de confianza
+    residuals_val = y_test.values - pred
 
-    # Predicción con intervalo de confianza
+    save_model(best_model, "models/forecast_model.pkl")
+
+    # Guarda los residuales para que forecast_next_week los pueda usar
+    np.save("models/residuals_val.npy", residuals_val)
+
+    # 3. Predicción con intervalo calibrado
     mean_pred, lower, upper = predict_with_interval(
         best_model,
         X_test,
+        residuals_val,
         confidence=0.90
     )
 
-    # Verifica qué tan bien calibrado está el intervalo:
-    # ¿qué % de los valores reales cayeron dentro del rango?
+    # 4. Verificar cobertura (esta parte SÍ es igual a la que ya tenías)
     coverage = ((y_test >= lower) & (y_test <= upper)).mean()
     print(f"Cobertura del intervalo al 90%: {coverage:.2%}")
 
@@ -175,11 +172,9 @@ def main():
         inventory,
         catalog
     )
-    print("OK OPTIMIZACION1")
 
     optimization_df = calculate_inventory_targets(df)
-    
-    print("OK OPTIMIZACION2")
+
     results = optimize_inventory(
         optimization_df
     )
