@@ -286,10 +286,10 @@ def optimize_model(
     """
 
     param_grid = {
-        "model__n_estimators": [200],#, 300, 500],
-        "model__max_depth": [10],#, 20, None],
-        "model__min_samples_split": [2],#, 5, 10],
-        "model__min_samples_leaf": [1, 2]#, 4],
+        "model__n_estimators": [200, 300, 500],
+        "model__max_depth": [10, 20, None],
+        "model__min_samples_split": [2, 5, 10],
+        "model__min_samples_leaf": [1, 2, 4],
     }
 
     tscv = TimeSeriesSplit(n_splits=5)
