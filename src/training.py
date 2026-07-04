@@ -1,5 +1,6 @@
 from pathlib import Path
 import pandas as pd
+import numpy as np
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.pipeline import Pipeline
@@ -13,7 +14,6 @@ from src.evaluation import evaluate_metrics
 from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
 import joblib
 from src.config import PROCESSED_DATA
-
 
 
 CATEGORICAL_FEATURES = [
@@ -52,9 +52,13 @@ def load_training_data() -> pd.DataFrame:
         Dataset listo para entrenar el modelo.
     """
 
-    return pd.read_csv(
+    df = pd.read_csv(
         PROCESSED_DATA / "training_dataset.csv"
     )
+    
+    df["fecha"] = pd.to_datetime(df["fecha"])
+ 
+    return df
 
 def prepare_target(df: pd.DataFrame):
     """
@@ -282,10 +286,10 @@ def optimize_model(
     """
 
     param_grid = {
-        "model__n_estimators": [200, 300, 500],
-        "model__max_depth": [10, 20, None],
-        "model__min_samples_split": [2, 5, 10],
-        "model__min_samples_leaf": [1, 2, 4],
+        "model__n_estimators": [200],#, 300, 500],
+        "model__max_depth": [10],#, 20, None],
+        "model__min_samples_split": [2],#, 5, 10],
+        "model__min_samples_leaf": [1, 2]#, 4],
     }
 
     tscv = TimeSeriesSplit(n_splits=5)
@@ -324,25 +328,36 @@ def predict_with_interval(
     """
     Genera predicción puntual e intervalo de confianza usando
     la dispersión entre los árboles del ExtraTreesRegressor.
-
-    Parameters
-    ----------
-    model : ExtraTreesRegressor
-        Modelo ya entrenado.
-    X : array-like
-        Features para predecir.
-    confidence : float
-        Nivel de confianza deseado (ej. 0.90 para 90%).
-
-    Returns
-    -------
-    mean_pred, lower, upper : np.ndarray
     """
-    tree_preds = np.array([tree.predict(X) for tree in model.estimators_])
+
+    # Si el modelo es un Pipeline, extraer el ExtraTreesRegressor
+    if isinstance(model, Pipeline):
+        preprocessor = model.named_steps["preprocessor"]
+        estimator = model.named_steps["model"]
+
+        X = preprocessor.transform(X)
+
+    else:
+        estimator = model
+
+    tree_preds = np.array([
+        tree.predict(X)
+        for tree in estimator.estimators_
+    ])
 
     mean_pred = tree_preds.mean(axis=0)
-    lower = np.percentile(tree_preds, (1 - confidence) / 2 * 100, axis=0)
-    upper = np.percentile(tree_preds, (1 + confidence) / 2 * 100, axis=0)
+
+    lower = np.percentile(
+        tree_preds,
+        (1 - confidence) / 2 * 100,
+        axis=0,
+    )
+
+    upper = np.percentile(
+        tree_preds,
+        (1 + confidence) / 2 * 100,
+        axis=0,
+    )
 
     return mean_pred, lower, upper
 

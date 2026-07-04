@@ -6,12 +6,17 @@ from src.features import (
     create_lag_features,
     create_rolling_features,
 )
+from src.training import predict_with_interval
 
 def build_next_day_features(history_df: pd.DataFrame) -> pd.DataFrame:
     """
     Construye las variables necesarias para predecir el siguiente día
     para cada combinación tienda-producto.
     """
+
+    history_df = history_df.copy()
+
+    history_df["fecha"] = pd.to_datetime(history_df["fecha"])
 
     # Última observación de cada tienda-producto
     future_df = (
@@ -63,8 +68,15 @@ def forecast_next_week(history_df, model_path):
         # Predecir demanda
         pred = model.predict(X_future)
 
-        # Guardar la predicción
-        future_df["unidades_vendidas"] = pred
+        mean_pred, lower, upper = predict_with_interval(
+            model,
+            X_future,
+            confidence=0.90
+        )
+
+        future_df["unidades_vendidas"] = mean_pred
+        future_df["demanda_lower"] = lower
+        future_df["demanda_upper"] = upper
 
         # Agregar al resultado
         forecasts.append(future_df)

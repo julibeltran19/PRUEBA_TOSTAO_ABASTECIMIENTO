@@ -20,10 +20,14 @@ from src.training import (
     train_best_model,
     predict,
     evaluate_metrics,
+    predict_with_interval,
     save_model,
 )
 
-from src.forecasting import forecast_next_week
+from src.forecasting import (
+    forecast_next_week,
+    save_forecast
+)
 
 from src.optimization import (
     load_forecast,
@@ -33,6 +37,7 @@ from src.optimization import (
     calculate_inventory_targets,
     optimize_inventory,
     save_optimization_results,
+    
 )
 
 def main():
@@ -119,19 +124,31 @@ def main():
         "models/forecast_model.pkl"
     )
 
+    # Predicción con intervalo de confianza
+    mean_pred, lower, upper = predict_with_interval(
+        best_model,
+        X_test,
+        confidence=0.90
+    )
+
+    # Verifica qué tan bien calibrado está el intervalo:
+    # ¿qué % de los valores reales cayeron dentro del rango?
+    coverage = ((y_test >= lower) & (y_test <= upper)).mean()
+    print(f"Cobertura del intervalo al 90%: {coverage:.2%}")
+
     print("OK")
 
     print("="*60)
     print("4. Forecast")
     print("="*60)
-
-    forecast = forecast_next_week(
+    
+    future_forecast = forecast_next_week(
         history_df=df,
         model_path="models/forecast_model.pkl"
     )
 
     save_forecast(
-        forecast,
+        future_forecast,
         "data/processed/next_week_forecast.csv"
     )
 
@@ -153,16 +170,16 @@ def main():
         "data/raw/catalogo_productos.csv"
     )
 
-    optimization_df = prepare_optimization_data(
+    df = prepare_optimization_data(
         forecast,
         inventory,
         catalog
     )
+    print("OK OPTIMIZACION1")
 
-    optimization_df = calculate_inventory_targets(
-        optimization_df
-    )
-
+    optimization_df = calculate_inventory_targets(df)
+    
+    print("OK OPTIMIZACION2")
     results = optimize_inventory(
         optimization_df
     )
